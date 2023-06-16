@@ -9,7 +9,8 @@ function App() {
   const [userList, setUserList] = useState([]);
   const [socket, setSocket] = useState(() => io("http://localhost:3000", {autoConnect: false}));
   const [sessionID, setSessionID] = useState(() => (localStorage.getItem("sessionID")) ? localStorage.getItem("sessionID") : "");
-
+  const [messages, setMessages] = useState([]);
+  console.log(messages);
   useEffect(() => {
     // check if user exists;
     (async function() {
@@ -31,6 +32,7 @@ function App() {
         socket.userID = userID;
       }
       function onUsers(data) {
+        console.log(data);
         setUserList(data.map(user => ({...user, hasNotification: false})));
       }
       function onOtherUserConnected(user) {
@@ -49,7 +51,7 @@ function App() {
         console.log(data);
       }
       function onPrivateMessage({content, from}) {
-        console.log(`'${content}' from ${from}`);
+        setMessages(prev => [...prev, {content, from}]);
         // notification
         setUserList(prev => {
           return prev.map(user => {
@@ -84,9 +86,14 @@ function App() {
   
   const handleSendMsg = async (to, message) => {
     // await socket.emit("send message", message);
-    socket.emit("private message", {
+    const payload = {
       content: message,
       to: to,
+    }
+    socket.emit("private message", payload, (err, success) => {
+      if(success) {
+        setMessages(prev => [...prev, payload]);
+      }
     })
   }
 

@@ -7,16 +7,32 @@ const createID = () => {
     return crypto.randomBytes(24).toString("hex");
 }
 const store = new InMemoryStore();
-store
-    .saveSession("9adc166807677be95cad9b22c40dbc20643aee00fab80d6b", {
+// obj, from, to, content
+const messages = []
+store.saveSession("9adc166807677be95cad9b22c40dbc20643aee00fab80d6b", {
         userID: "06581a47b691172a4c960e3d9c72205a4c6047686c0d6d09",
-        username: "persitent"
+        username: "persitent",
+        online: true,
     })
-// store
-//     .saveSession("c58e96d4580154e3711e15ef87e155315669838a0f1e0fee", {
-//         userID: "17104909d8c395eb8322aa56fe53d4c6ac8e3f8436d7feb7",
-//         username: "crab"
-//     })
+store.saveSession("c58e96d4580154e3711e15ef87e155315669838a0f1e0fee", {
+        userID: "17104909d8c395eb8322aa56fe53d4c6ac8e3f8436d7feb7",
+        username: "crab"
+    })
+
+messages.push({
+    from: "06581a47b691172a4c960e3d9c72205a4c6047686c0d6d09",
+    to: "17104909d8c395eb8322aa56fe53d4c6ac8e3f8436d7feb7",
+    content: "hello crab from presistent"
+})
+messages.push({
+    from: "06581a47b691172a4c960e3d9c72205a4c6047686c0d6d09",
+    to: "17104909d8c395eb8322aa56fe53d4c6ac8e3f8436d7feb7",
+    content: "test123"
+})
+
+function getUserMessages(id, messages) {
+    return messages?.filter(msg => (id === msg.from || id === msg.to));
+}
 
 const app = express();
 const server = http.createServer(http);
@@ -55,17 +71,25 @@ io.use((socket, next) => {
 io.on("connection", (socket) => {
     // console.log(`user ${socket.username}:${socket.userID} connected`);
     console.log(`${socket.userID} joined the room`);
+    socket.join(socket.userID);
+    
+    const toUpdateObject = store.findSession(socket.sessionID);
+    if(toUpdateObject) {
+        toUpdateObject.online = true
+    }
     const users = [];
+
+    // get existing messages of user
+    const userMessages = getUserMessages(socket.userID, messages);
 
     for(let [sessionID, session] of store.getSession()) {
         users.push({
             username: session.username,
             userID: session.userID,
-            online: (sessionID === socket.sessionID) ? true : session.online,
+            online: session.online,
+            messages: userMessages,
         })
     }
-
-    socket.join(socket.userID);
 
     socket.emit("session", {
         sessionID: socket.sessionID,
@@ -103,9 +127,10 @@ io.on("connection", (socket) => {
         })
     })
 
-    socket.on("private message", ({ content, to }) => {
+    socket.on("private message", ({ content, to }, callback) => {
         console.log(`private message to room ${to}`);
         socket.to(to).emit("private message", {content, from: socket.userID});
+        callback(null, true);
     })
 })
 
